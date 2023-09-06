@@ -21,9 +21,9 @@ public class TestDbCreation {
 	public static final  Long ID5 = 127l;
 	public static final  Long ID6 = 128l;
 	public static final  String PHONE1 = "054-1231231";
-	public static final  String PHONE2 = "054-1234333";
-	public static final  String PHONE3 = "050-3333333";
-	public static final  String PHONE4 = "051-4444444";
+	public static final  String PHONE2 = "050-1234333";
+	public static final  String PHONE3 = "054-3333333";
+	public static final  String PHONE4 = "050-4444444";
 	public static final  String PHONE5 = "055-5555555";
 	public static final  String PHONE6 = "050-6666666";
 	public static final String SUBJECT1 = "Java";
@@ -46,31 +46,32 @@ public class TestDbCreation {
 		new Student(ID6, "name6", PHONE6),	
 	};
 	Mark[][] marks = {
-			{
+			{//ID1
 				new Mark(SUBJECT1, DATE1, 80),
 				new Mark(SUBJECT1, DATE1, 90),
 				new Mark(SUBJECT2, DATE2, 70),
 				new Mark(SUBJECT3, DATE3, 90)
 			},
-			{
+			{//ID2
 				new Mark(SUBJECT1, DATE1, 70),
 				new Mark(SUBJECT2, DATE2, 80)
 				
 			},
-			{	new Mark(SUBJECT1, DATE1, 80),
-				new Mark(SUBJECT2, DATE2, 70),
+			{//ID3	
+				new Mark(SUBJECT1, DATE1, 80),
+				new Mark(SUBJECT2, DATE2, 75),
 				new Mark(SUBJECT3, DATE3, 90),
 				new Mark(SUBJECT4, DATE4, 100)
 			},
-			{
+			{//ID4
 				new Mark(SUBJECT4, DATE4, 70)
 			},
-			{
+			{//ID5
 				new Mark(SUBJECT1, DATE1, 80),
-				new Mark(SUBJECT2, DATE2, 70),
+				new Mark(SUBJECT2, DATE2, 71),
 				new Mark(SUBJECT3, DATE3, 90)
 			},
-			{
+			{//ID6
 			
 			}
 	};

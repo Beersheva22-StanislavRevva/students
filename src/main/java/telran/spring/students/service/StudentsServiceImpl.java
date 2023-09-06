@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import telran.spring.students.repo.StudentRepository;
 import telran.spring.students.docs.StudentDoc;
+import telran.spring.students.dto.IdName;
 import telran.spring.students.dto.Mark;
 import telran.spring.students.dto.Student;
 import telran.spring.students.dto.SubjectMark;
@@ -68,6 +69,36 @@ public class StudentsServiceImpl implements StudentsService {
 			}).toList();
 		}
 		return res;
+	}
+
+	@Override
+	public List<StudentDoc> getStudentsPhonePrefix(String phonePrefix) {
+		
+		return studentRepo.findStudentsPhonePrefix(phonePrefix);
+		
+	}
+
+	@Override
+	public List<IdName> getStudentsAllScoresGreater(int score) {
+		
+		return studentRepo.findStudentsAllMarksGreater(score);
+	}
+
+	@Override
+	public List<Long> removeStudentsWithFewMarks(int nMarks) {
+		List<StudentDoc> studentsRemoved = studentRepo.removeStudentsFewMarks(nMarks);
+		return studentsRemoved.stream().map(StudentDoc::getId).toList();
+	}
+
+	@Override
+	public List<IdName> getStudentsScoresSubjectGreater(int score, String subject) {
+		return studentRepo.findStudentsMarksSubjectGreater(score, subject);
+	}
+
+	@Override
+	public List<Long> removeStudentsNoLowMarks(int score) {
+	List<StudentDoc> studentsRemoved = studentRepo.removeStudentsNoLowMarks(score);
+	return studentsRemoved.stream().map(StudentDoc::getId).toList();
 	}
 
 }
