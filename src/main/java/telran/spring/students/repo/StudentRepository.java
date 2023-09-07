@@ -18,7 +18,7 @@ public interface StudentRepository extends MongoRepository<StudentDoc, Long> {
 	List<IdName> findStudentsAllMarksGreater(int score);
 	@Query(value="{$expr:{$lt:[{$size:$marks},?0]}}", fields = "{}", delete = true)
 	List<StudentDoc> removeStudentsFewMarks(int nMarks);
-	@Query("{$and:[{marks:{$elemMatch:{subject:{$eq:?1}}}}, {marks:{$elemMatch:{score:{$gt:?0}}}}]}")
+	@Query("{$and:[{marks:{$elemMatch:{subject:{$eq:?1},score:{$gte:?0}}}}, {marks:{$not:{$elemMatch:{score:{$lte:?0},subject:{$eq:?1}}}}}]}")
 	List<IdName> findStudentsMarksSubjectGreater(int score, String subject);
 	@Query(value="{marks:{$not:{$elemMatch:{score:{$gte:?0}}}}}", fields = "{}", delete = true)
 	List<StudentDoc> removeStudentsNoLowMarks(int score);

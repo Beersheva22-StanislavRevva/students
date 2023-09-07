@@ -2,7 +2,9 @@ package telran.spring.students;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.springframework.stereotype.Component;
 import lombok.RequiredArgsConstructor;
@@ -85,6 +87,9 @@ public class TestDbCreation {
 		StudentDoc res = new StudentDoc(student.id(), student.name(), student.phone(), null);
 		res.setMarks(new ArrayList<>(List.of(marks[index])));
 		return res;
+	}
+	double getAvgMark() {
+		return Arrays.stream(marks).flatMap(Arrays::stream).collect(Collectors.averagingInt(Mark::score));
 	}
 
 }

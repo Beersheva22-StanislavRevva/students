@@ -1,29 +1,33 @@
 package telran.spring.students.service;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import telran.spring.exceptions.NotFoundException;
 
+import org.bson.Document;
+import org.springframework.data.domain.Sort.Direction;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.*;
+import org.springframework.data.mongodb.core.query.Criteria;
+
+import static org.springframework.data.mongodb.core.aggregation.Aggregation.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import telran.spring.students.repo.StudentRepository;
+import telran.spring.exceptions.NotFoundException;
 import telran.spring.students.docs.StudentDoc;
-import telran.spring.students.dto.IdName;
-import telran.spring.students.dto.Mark;
-import telran.spring.students.dto.Student;
-import telran.spring.students.dto.SubjectMark;
+import telran.spring.students.dto.*;
 
-
+import telran.spring.students.repo.StudentRepository;
 @RequiredArgsConstructor
 @Slf4j
 @Service
-public class StudentsServiceImpl implements StudentsService {
+public  class StudentsServiceImpl implements StudentsService {
+	private static final Object GOOD_MARK_THRESH0LD = null;
 	final StudentRepository studentRepo;
+	final MongoTemplate mongoTemplate;
 	@Override
 	@Transactional(readOnly = false)
 	public Student addStudent(Student student) {
@@ -32,7 +36,7 @@ public class StudentsServiceImpl implements StudentsService {
 		}
 		StudentDoc studentDoc = StudentDoc.of(student);
 		Student studentRes = studentRepo.save(studentDoc).build();
-		log.trace("student {} has been added", studentRes);
+		log.trace("Student {} has been added", studentRes);
 		return studentRes;
 	}
 
@@ -44,6 +48,7 @@ public class StudentsServiceImpl implements StudentsService {
 		List<Mark>marks = studentDoc.getMarks();
 		marks.add(mark);
 		studentRepo.save(studentDoc);
+		
 
 	}
 
@@ -55,7 +60,6 @@ public class StudentsServiceImpl implements StudentsService {
 			res = allMarks.getMarks().stream().filter(m -> m.subject().equals(subject)).toList();
 		}
 		return res;
-		
 	}
 
 	@Override
@@ -75,11 +79,10 @@ public class StudentsServiceImpl implements StudentsService {
 	public List<StudentDoc> getStudentsPhonePrefix(String phonePrefix) {
 		
 		return studentRepo.findStudentsPhonePrefix(phonePrefix);
-		
 	}
 
 	@Override
-	public List<IdName> getStudentsAllScoresGreater(int score) {
+	public List<IdName> getSudentsAllScoresGreater(int score) {
 		
 		return studentRepo.findStudentsAllMarksGreater(score);
 	}
@@ -91,14 +94,25 @@ public class StudentsServiceImpl implements StudentsService {
 	}
 
 	@Override
-	public List<IdName> getStudentsScoresSubjectGreater(int score, String subject) {
-		return studentRepo.findStudentsMarksSubjectGreater(score, subject);
+	public double getStudentsAvgScore() {
+		UnwindOperation unwindOperation = unwind("marks");
+		GroupOperation groupOperation = group().avg("marks.score").as("avgScore");
+		Aggregation pipeLine = newAggregation(List.of(unwindOperation, groupOperation));
+		var aggregationResult = mongoTemplate.aggregate(pipeLine, StudentDoc.class,Document.class);
+		double res = aggregationResult.getUniqueMappedResult().getDouble("avgScore");
+		return res;
 	}
 
 	@Override
-	public List<Long> removeStudentsNoLowMarks(int score) {
-	List<StudentDoc> studentsRemoved = studentRepo.removeStudentsNoLowMarks(score);
-	return studentsRemoved.stream().map(StudentDoc::getId).toList();
+	public List<IdName> getGoodStudents() {
+		UnwindOperation unwindOperation = unwind("marks");
+		GroupOperation groupOperation = group("id","name").avg("marks.score").as("avgScore");
+ 		MatchOperation matchOperation  = match(Criteria.where("avgScore").gt(GOOD_MARK_THRESH0LD));
+		SortOperation sortOperation = sort(Direction.DESC,"avgScore");
+		Aggregation pipeLine = newAggregation(List.of(unwindOperation, groupOperation, matchOperation, sortOperation));
+		var aggregationResult = mongoTemplate.aggregate(pipeLine, StudentDoc.class,Document.class);
+		List<Document> resultDocument = aggregationResult.getMappedResults();
+		return null;
 	}
 
 }
