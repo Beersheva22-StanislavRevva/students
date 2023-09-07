@@ -1,33 +1,46 @@
 package telran.spring.students.service;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import telran.spring.exceptions.NotFoundException;
 
-import org.bson.Document;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort.Direction;
-import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.*;
 import org.springframework.data.mongodb.core.query.Criteria;
-
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.bson.Document;
+import org.springframework.data.mongodb.core.aggregation.*;
 import static org.springframework.data.mongodb.core.aggregation.Aggregation.*;
+import org.springframework.data.mongodb.core.aggregation.GroupOperation;
+import org.springframework.data.mongodb.core.aggregation.MatchOperation;
+import org.springframework.data.mongodb.core.aggregation.SortOperation;
+import org.springframework.data.mongodb.core.aggregation.UnwindOperation;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import telran.spring.exceptions.NotFoundException;
-import telran.spring.students.docs.StudentDoc;
-import telran.spring.students.dto.*;
-
 import telran.spring.students.repo.StudentRepository;
+import telran.spring.students.docs.StudentDoc;
+import telran.spring.students.dto.IdName;
+import telran.spring.students.dto.Mark;
+import telran.spring.students.dto.Student;
+import telran.spring.students.dto.SubjectMark;
+
+
 @RequiredArgsConstructor
 @Slf4j
 @Service
-public  class StudentsServiceImpl implements StudentsService {
-	private static final Object GOOD_MARK_THRESH0LD = null;
-	final StudentRepository studentRepo;
+public class StudentsServiceImpl implements StudentsService {
+	private static final Integer GOOD_MARK_THRESH0LD = 80;
+	 private static final String AVG_SCORE_FIELD = "avgScore";
 	final MongoTemplate mongoTemplate;
+	final StudentRepository studentRepo;
+	@Value("${app.students.mark.good:80}")
+	int goodMark;
 	@Override
 	@Transactional(readOnly = false)
 	public Student addStudent(Student student) {
@@ -36,7 +49,7 @@ public  class StudentsServiceImpl implements StudentsService {
 		}
 		StudentDoc studentDoc = StudentDoc.of(student);
 		Student studentRes = studentRepo.save(studentDoc).build();
-		log.trace("Student {} has been added", studentRes);
+		log.trace("student {} has been added", studentRes);
 		return studentRes;
 	}
 
@@ -48,7 +61,6 @@ public  class StudentsServiceImpl implements StudentsService {
 		List<Mark>marks = studentDoc.getMarks();
 		marks.add(mark);
 		studentRepo.save(studentDoc);
-		
 
 	}
 
@@ -60,6 +72,7 @@ public  class StudentsServiceImpl implements StudentsService {
 			res = allMarks.getMarks().stream().filter(m -> m.subject().equals(subject)).toList();
 		}
 		return res;
+		
 	}
 
 	@Override
@@ -79,10 +92,11 @@ public  class StudentsServiceImpl implements StudentsService {
 	public List<StudentDoc> getStudentsPhonePrefix(String phonePrefix) {
 		
 		return studentRepo.findStudentsPhonePrefix(phonePrefix);
+		
 	}
 
 	@Override
-	public List<IdName> getSudentsAllScoresGreater(int score) {
+	public List<IdName> getStudentsAllScoresGreater(int score) {
 		
 		return studentRepo.findStudentsAllMarksGreater(score);
 	}
@@ -94,6 +108,16 @@ public  class StudentsServiceImpl implements StudentsService {
 	}
 
 	@Override
+	public List<IdName> getStudentsScoresSubjectGreater(int score, String subject) {
+		return studentRepo.findStudentsMarksSubjectGreater(score, subject);
+	}
+
+	@Override
+	public List<Long> removeStudentsNoLowMarks(int score) {
+	List<StudentDoc> studentsRemoved = studentRepo.removeStudentsNoLowMarks(score);
+	return studentsRemoved.stream().map(StudentDoc::getId).toList();
+	}
+	@Override
 	public double getStudentsAvgScore() {
 		UnwindOperation unwindOperation = unwind("marks");
 		GroupOperation groupOperation = group().avg("marks.score").as("avgScore");
@@ -102,17 +126,38 @@ public  class StudentsServiceImpl implements StudentsService {
 		double res = aggregationResult.getUniqueMappedResult().getDouble("avgScore");
 		return res;
 	}
-
+	
 	@Override
 	public List<IdName> getGoodStudents() {
-		UnwindOperation unwindOperation = unwind("marks");
-		GroupOperation groupOperation = group("id","name").avg("marks.score").as("avgScore");
- 		MatchOperation matchOperation  = match(Criteria.where("avgScore").gt(GOOD_MARK_THRESH0LD));
-		SortOperation sortOperation = sort(Direction.DESC,"avgScore");
-		Aggregation pipeLine = newAggregation(List.of(unwindOperation, groupOperation, matchOperation, sortOperation));
-		var aggregationResult = mongoTemplate.aggregate(pipeLine, StudentDoc.class,Document.class);
-		List<Document> resultDocument = aggregationResult.getMappedResults();
-		return null;
+		log.debug("good mark threshold is {} ", goodMark);
+		return getStudentsAvgMarkGreater(goodMark);
+	}
+	@Override
+	  public List<IdName> getStudentsAvgMarkGreater(int score) {
+	    UnwindOperation unwindOperation = unwind("marks");
+	    GroupOperation groupOperation = group("id", "name").avg("marks.score").as(AVG_SCORE_FIELD);
+	    MatchOperation matchOperation = match(Criteria.where(AVG_SCORE_FIELD).gt(score));
+	    SortOperation sortOperation = sort(Direction.DESC, AVG_SCORE_FIELD);
+	    ProjectionOperation projectionOperation = project().andExclude(AVG_SCORE_FIELD);
+	    Aggregation pipeLine = newAggregation(List.of(unwindOperation, groupOperation, matchOperation, sortOperation, projectionOperation));
+	    var aggregationResult = mongoTemplate.aggregate(pipeLine, StudentDoc.class, Document.class);
+	    List<Document> resultDocument = aggregationResult.getMappedResults();    
+	    return resultDocument.stream().map(this::toIdName).toList();
+	  
+	}
+	IdName toIdName(Document document) {
+		return new IdName() {
+			Document idDocument = document.get("_id", Document.class);
+			@Override
+			public String getName() {
+				return idDocument.getString("name");
+			}
+			@Override
+			public long getId() {
+				
+				return idDocument.getLong("id");
+			}
+			};
 	}
 
 }

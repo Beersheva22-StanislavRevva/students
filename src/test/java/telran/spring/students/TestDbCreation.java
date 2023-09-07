@@ -91,5 +91,7 @@ public class TestDbCreation {
 	double getAvgMark() {
 		return Arrays.stream(marks).flatMap(Arrays::stream).collect(Collectors.averagingInt(Mark::score));
 	}
-
+	double getAvgMarksStudent(long id) {
+		return Arrays.stream(marks[(int) (id-123)]).collect(Collectors.averagingInt(Mark::score));
+	}
 }
