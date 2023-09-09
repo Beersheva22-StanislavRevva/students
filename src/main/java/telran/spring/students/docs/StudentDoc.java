@@ -17,7 +17,7 @@ public class StudentDoc {
 		this.phone = phone;
 		this.marks = marks;
 	}
-	final long id;
+	private final long id;
 	String name;
 	String phone;
 	List<Mark> marks = new ArrayList<>();;
@@ -25,6 +25,6 @@ public class StudentDoc {
 		return new StudentDoc(student.id(), student.name(), student.phone(), null);
 	}
 	public Student build() {
-		return new Student(id, name, phone);
+		return new Student(getId(), name, phone);
 	}
 }

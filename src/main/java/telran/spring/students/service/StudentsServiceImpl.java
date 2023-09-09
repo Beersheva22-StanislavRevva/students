@@ -1,5 +1,6 @@
 package telran.spring.students.service;
 
+import java.lang.reflect.Array;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -9,6 +10,7 @@ import telran.spring.exceptions.NotFoundException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort.Direction;
 import org.springframework.data.mongodb.core.aggregation.*;
+import org.springframework.data.mongodb.core.query.BasicQuery;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.bson.Document;
@@ -26,7 +28,9 @@ import lombok.extern.slf4j.Slf4j;
 import telran.spring.students.repo.StudentRepository;
 import telran.spring.students.docs.StudentDoc;
 import telran.spring.students.dto.IdName;
+import telran.spring.students.dto.IdNameMarks;
 import telran.spring.students.dto.Mark;
+import telran.spring.students.dto.MarksBucket;
 import telran.spring.students.dto.Student;
 import telran.spring.students.dto.SubjectMark;
 
@@ -37,6 +41,7 @@ import telran.spring.students.dto.SubjectMark;
 public class StudentsServiceImpl implements StudentsService {
 	private static final Integer GOOD_MARK_THRESH0LD = 80;
 	 private static final String AVG_SCORE_FIELD = "avgScore";
+	private static final String SUM_SCORE_FIELD = "SumScore";
 	final MongoTemplate mongoTemplate;
 	final StudentRepository studentRepo;
 	@Value("${app.students.mark.good:80}")
@@ -89,9 +94,9 @@ public class StudentsServiceImpl implements StudentsService {
 	}
 
 	@Override
-	public List<StudentDoc> getStudentsPhonePrefix(String phonePrefix) {
+	public List<Student> getStudentsPhonePrefix(String phonePrefix) {
 		
-		return studentRepo.findStudentsPhonePrefix(phonePrefix);
+		return studentRepo.findStudentsPhonePrefix(phonePrefix).stream().map(StudentDoc::build).toList();
 		
 	}
 
@@ -148,6 +153,7 @@ public class StudentsServiceImpl implements StudentsService {
 	IdName toIdName(Document document) {
 		return new IdName() {
 			Document idDocument = document.get("_id", Document.class);
+			
 			@Override
 			public String getName() {
 				return idDocument.getString("name");
@@ -160,4 +166,104 @@ public class StudentsServiceImpl implements StudentsService {
 			};
 	}
 
+	@Override
+	public List<IdNameMarks> findStudents(String jsonQuery) {
+		BasicQuery query = new BasicQuery(jsonQuery);
+		List<StudentDoc> students = mongoTemplate.find(query, StudentDoc.class);
+		
+		return students.stream().map(this::toIdNameMarks).toList();
+	}
+	IdNameMarks toIdNameMarks(StudentDoc studentDoc) {
+		return new IdNameMarks() {
+
+			@Override
+			public long getId() {
+				
+				return studentDoc.getId();
+			}
+
+			@Override
+			public String getName() {
+				
+				return studentDoc.getName();
+			}
+
+			@Override
+			public List<Mark> getMarks() {
+				
+				return studentDoc.getMarks();
+			}
+			
+		  };
+		}
+
+	@Override
+	public List<IdNameMarks> getBestStudents(int nStudents) {
+		 UnwindOperation unwindOperation = unwind("marks");
+		    GroupOperation groupOperation = group("id", "name").sum("marks.score").as(SUM_SCORE_FIELD);
+		     SortOperation sortOperation = sort(Direction.DESC, SUM_SCORE_FIELD);
+		     LimitOperation limitOperation = limit(nStudents);
+		    ProjectionOperation projectionOperation = project().andExclude(SUM_SCORE_FIELD);
+		    Aggregation pipeLine = newAggregation(List.of(unwindOperation, groupOperation, sortOperation, limitOperation, projectionOperation));
+		    var aggregationResult = mongoTemplate.aggregate(pipeLine, StudentDoc.class, Document.class);
+		    List<Document> resultDocument = aggregationResult.getMappedResults();    
+		    List<IdName>idNameList = resultDocument.stream().map(this::toIdName).toList();
+		    List<StudentDoc> students = findStudentsByIdName(idNameList);
+			return students.stream().map(this::toIdNameMarks).toList();
+	}
+
+	private List<StudentDoc> findStudentsByIdName(List<IdName> idNameList) {
+		String[]idArray = new String[idNameList.size()];
+		for (int i = 0; i < idNameList.size(); i++) {
+			idArray[i] = String.format("{id:%d}",idNameList.get(i).getId());
+		}
+		 String jsonQuery = String.format("{ $or: [%s] }",String.join(",", idArray));
+		BasicQuery query = new BasicQuery(jsonQuery);
+		List<StudentDoc> studentsList = mongoTemplate.find(query, StudentDoc.class);
+		return sortStudentList(studentsList, idNameList);
+	}
+
+	private List<StudentDoc> sortStudentList(List<StudentDoc> studentsList, List<IdName> idNameList) {
+		List<StudentDoc> sortedList = new ArrayList<StudentDoc>();
+		idNameList.stream().forEach(e -> sortedList.add(studentsList.stream().filter(el -> el.getId() == e.getId()).toList().get(0)));
+		return sortedList;
+	}
+
+	@Override
+	public List<IdNameMarks> getworstStudents(int nStudents) {
+		UnwindOperation unwindOperation = unwind("marks");
+	    GroupOperation groupOperation = group("id", "name").sum("marks.score").as(SUM_SCORE_FIELD);
+	     SortOperation sortOperation = sort(Direction.ASC, SUM_SCORE_FIELD);
+	     LimitOperation limitOperation = limit(nStudents);
+	    ProjectionOperation projectionOperation = project().andExclude(SUM_SCORE_FIELD);
+	    Aggregation pipeLine = newAggregation(List.of(unwindOperation, groupOperation, sortOperation, limitOperation, projectionOperation));
+	    var aggregationResult = mongoTemplate.aggregate(pipeLine, StudentDoc.class, Document.class);
+	    List<Document> resultDocument = aggregationResult.getMappedResults();    
+	    List<IdName>idNameList = resultDocument.stream().map(this::toIdName).toList();
+	    List<StudentDoc> students = findStudentsByIdName(idNameList);
+		return students.stream().map(this::toIdNameMarks).toList();
+	}
+
+	@Override
+	public List<IdNameMarks> getBestStudentsSubject(int nStudents, String subject) {
+		UnwindOperation unwindOperation = unwind("marks");
+		MatchOperation matchOperation = match(Criteria.where("marks.subject").is(subject));
+	    GroupOperation groupOperation = group("id", "name").sum("marks.score").as(SUM_SCORE_FIELD);
+	     SortOperation sortOperation = sort(Direction.DESC, SUM_SCORE_FIELD);
+	     LimitOperation limitOperation = limit(nStudents);
+	    ProjectionOperation projectionOperation = project().andExclude(SUM_SCORE_FIELD);
+	    Aggregation pipeLine = newAggregation(List.of(unwindOperation,matchOperation, groupOperation, sortOperation, limitOperation, projectionOperation));
+	    var aggregationResult = mongoTemplate.aggregate(pipeLine, StudentDoc.class, Document.class);
+	    List<Document> resultDocument = aggregationResult.getMappedResults();    
+	    List<IdName>idNameList = resultDocument.stream().map(this::toIdName).toList();
+	    List<StudentDoc> students = findStudentsByIdName(idNameList);
+		return students.stream().map(this::toIdNameMarks).toList();
+	}
+
+	@Override
+	public List<MarksBucket> scoresDistribution(int nBuckets) {
+		// TODO Auto-generated method stub
+		BucketAutoOperation bucketOperation = bucketAuto("marks.score", nBuckets);
+		return null;
+	}
 }
