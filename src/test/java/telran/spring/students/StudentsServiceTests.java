@@ -4,6 +4,7 @@ import java.net.IDN;
 import java.time.LocalDate;
 import java.util.List;
 
+import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.MethodOrderer;
@@ -18,6 +19,7 @@ import telran.spring.students.docs.StudentDoc;
 import telran.spring.students.dto.IdName;
 import telran.spring.students.dto.IdNameMarks;
 import telran.spring.students.dto.Mark;
+import telran.spring.students.dto.MarksBucket;
 import telran.spring.students.dto.Student;
 import telran.spring.students.dto.SubjectMark;
 import telran.spring.students.repo.StudentRepository;
@@ -151,6 +153,12 @@ class StudentsServiceTests {
 		assertEquals(2, bestSudentsSubjectList.size());
 		IdNameMarks bestStudentSubject1 = bestSudentsSubjectList.get(0);
 		assertEquals(ID1, bestStudentSubject1.getId());
+	}
+	@Test
+	void scoresDistributionTest() {
+		List<MarksBucket> scoreDistr = studentsService.scoresDistribution(3);
+		assertEquals(3, scoreDistr.size());
+		assertEquals(70,scoreDistr.get(0).min());
 	}
 	
 }
