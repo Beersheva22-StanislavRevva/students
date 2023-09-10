@@ -231,7 +231,7 @@ public class StudentsServiceImpl implements StudentsService {
 
 	@Override
 	public List<IdNameMarks> getworstStudents(int nStudents) {
-		UnwindOperation unwindOperation = unwind("marks");
+		UnwindOperation unwindOperation = unwind("marks",true);
 	    GroupOperation groupOperation = group("id", "name").sum("marks.score").as(SUM_SCORE_FIELD);
 	     SortOperation sortOperation = sort(Direction.ASC, SUM_SCORE_FIELD);
 	     LimitOperation limitOperation = limit(nStudents);
@@ -262,8 +262,19 @@ public class StudentsServiceImpl implements StudentsService {
 
 	@Override
 	public List<MarksBucket> scoresDistribution(int nBuckets) {
-		// TODO Auto-generated method stub
+		UnwindOperation unwindOperation = unwind("marks");
 		BucketAutoOperation bucketOperation = bucketAuto("marks.score", nBuckets);
-		return null;
+		Aggregation pipeLine = newAggregation(List.of(unwindOperation, bucketOperation));
+		var aggregationResult = mongoTemplate.aggregate(pipeLine, StudentDoc.class, Document.class);
+		List<Document> resultDocument = aggregationResult.getMappedResults();
+		log.debug(resultDocument.get(0).toJson());
+		return resultDocument.stream().map(this::toMarksBucket).toList();
+	}
+	MarksBucket toMarksBucket(Document document) {
+		Document rangeDocument = document.get("_id", Document.class);
+		int min = rangeDocument.getInteger("min");
+		int max = rangeDocument.getInteger("max");
+		int count = document.getInteger("count");
+		return new MarksBucket(min, max, count); 
 	}
 }

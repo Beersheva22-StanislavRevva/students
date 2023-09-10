@@ -20,8 +20,8 @@ public interface StudentsService {
 	List<IdName> getGoodStudents();
 	List<IdName> getStudentsAvgMarkGreater(int sccore);
 	List<IdNameMarks> findStudents(String jsonQuery);
-	List<IdNameMarks> getBestStudents(int nStudents); //'nStudents' best students ('best' criteria is sum of all student marks 
-	List<IdNameMarks> getworstStudents(int nStudents); // 'nStudents' worst students by the same criteria as 'best';
+	List<IdNameMarks> getBestStudents(int nStudents); 
+	List<IdNameMarks> getworstStudents(int nStudents);
 	List<IdNameMarks> getBestStudentsSubject(int nStudents, String subject);
 	List<MarksBucket> scoresDistribution(int nBuckets);
 	
